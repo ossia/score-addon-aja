@@ -42,13 +42,17 @@ if(WIN32 AND WIDL_EXECUTABLE AND EXISTS "${DECKLINK_SDK_ROOT}/Win/include/DeckLi
     VERBATIM)
 
   list(APPEND VIDEOIO_HDRS
+    "${CMAKE_CURRENT_SOURCE_DIR}/decklink/DeckLink.hpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/decklink/DeckLinkComPtr.hpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/decklink/DeckLinkFormats.hpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/decklink/DeckLinkDevices.hpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/decklink/DeckLinkOutputBackend.hpp")
+    "${CMAKE_CURRENT_SOURCE_DIR}/decklink/DeckLinkOutputBackend.hpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/decklink/DeckLinkCpuCapture.hpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/decklink/DeckLinkInputBackend.hpp")
   list(APPEND VIDEOIO_SRCS
     "${CMAKE_CURRENT_SOURCE_DIR}/decklink/DeckLinkDevices.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/decklink/DeckLinkOutputBackend.cpp")
+    "${CMAKE_CURRENT_SOURCE_DIR}/decklink/DeckLinkOutputBackend.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/decklink/DeckLinkInputBackend.cpp")
   list(APPEND VIDEOIO_GEN_SRCS "${DL_GEN_DIR}/DeckLinkAPI_i.c")
   list(APPEND VIDEOIO_INCS "${DL_GEN_DIR}")
   list(APPEND VIDEOIO_DEFS SCORE_HAS_DECKLINK=1)
