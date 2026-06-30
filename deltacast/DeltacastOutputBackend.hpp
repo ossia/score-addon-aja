@@ -5,18 +5,22 @@
 
 #include <QString>
 
+#include <cstddef>
 #include <cstdint>
 #include <functional>
+#include <utility>
 #include <vector>
 
 namespace Gfx::Deltacast
 {
+struct DeltacastRdmaOutput;
 
 struct DeltacastOutputSettings
 {
   int deviceIndex{0};
   ULONG videoStandard{VHD_VIDEOSTD_S274M_1080p_60Hz}; ///< VHD_VIDEOSTANDARD
   ULONG bufferPacking{VHD_BUFPACK_VIDEO_YUV422_8};    ///< VHD_BUFFERPACKING
+  bool useRDMA{true};  ///< Try the RDMA GPU-direct playout path (Vulkan+CUDA) first.
 };
 
 /**
@@ -49,11 +53,15 @@ public:
   std::vector<score::gfx::interop::HostStagedPlane> planes() const override;
   score::gfx::interop::VendorDmaRegistrar registrar() override;
   std::vector<std::function<std::unique_ptr<score::gfx::interop::GpuDirectStrategy>()>>
-  gpuDirectCandidates(QRhi*, score::gfx::GraphicsApi) override
-  {
-    return {}; // host-staged only for now; RDMA (Seam B) is a later pass
-  }
+  gpuDirectCandidates(QRhi* rhi, score::gfx::GraphicsApi api) override;
   score::gfx::interop::PacedFramePump::Hooks pacingHooks() override;
+
+  /// Called by DeltacastRdmaOutput::init() once its RDMA GPU VRAM slots exist:
+  /// registers each gpuVA as a Deltacast "application buffer" (VHD_CreateSlotEx
+  /// RDMAEnabled=TRUE) and starts the stream (the StartStream deferred from
+  /// open() in RDMA mode). Returns false on any failure, so the strategy fails
+  /// init() and the node falls back to the host-staged path.
+  bool registerRdmaOutputSlots(void* const* gpuVAs, std::size_t n);
 
 private:
   bool submitFrame(void* framePtr);
@@ -62,6 +70,11 @@ private:
 
   HANDLE m_board{nullptr};
   HANDLE m_stream{nullptr};
+
+  // RDMA playout: gpuVA -> VHD slot handle map, so submitFrame() can resolve the
+  // pointer prepareNextFrame() returned back to the slot to VHD_QueueOutSlot().
+  std::vector<std::pair<void*, HANDLE>> m_rdmaSlots;
+  bool m_rdmaMode{false};
 
   int m_width{};
   int m_height{};
