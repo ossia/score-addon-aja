@@ -16,9 +16,15 @@ find_package(${QT_VERSION} REQUIRED COMPONENTS Core Gui Widgets)
 # ---------------------------------------------------------------------------
 set(VIDEOIO_SRCS
   "${CMAKE_CURRENT_SOURCE_DIR}/score_addon_videoio.cpp"
+  "${CMAKE_CURRENT_SOURCE_DIR}/VideoIOSettings.cpp"
+  "${CMAKE_CURRENT_SOURCE_DIR}/VideoOutput.cpp"
+  "${CMAKE_CURRENT_SOURCE_DIR}/VideoInput.cpp"
 )
 set(VIDEOIO_HDRS
   "${CMAKE_CURRENT_SOURCE_DIR}/score_addon_videoio.hpp"
+  "${CMAKE_CURRENT_SOURCE_DIR}/VideoIOSettings.hpp"
+  "${CMAKE_CURRENT_SOURCE_DIR}/VideoOutput.hpp"
+  "${CMAKE_CURRENT_SOURCE_DIR}/VideoInput.hpp"
 )
 set(VIDEOIO_GEN_SRCS "")
 set(VIDEOIO_DEFS "")
@@ -108,11 +114,16 @@ if(WIN32 AND WIDL_EXECUTABLE AND EXISTS "${DECKLINK_SDK_ROOT}/Win/include/DeckLi
     "${CMAKE_CURRENT_SOURCE_DIR}/decklink/DeckLinkDevices.hpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/decklink/DeckLinkOutputBackend.hpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/decklink/DeckLinkCpuCapture.hpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/decklink/DeckLinkInputBackend.hpp")
+    "${CMAKE_CURRENT_SOURCE_DIR}/decklink/DeckLinkInputBackend.hpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/decklink/DeckLinkModeMap.hpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/decklink/DeckLinkNode.hpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/decklink/DeckLinkCaptureNode.hpp")
   list(APPEND VIDEOIO_SRCS
     "${CMAKE_CURRENT_SOURCE_DIR}/decklink/DeckLinkDevices.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/decklink/DeckLinkOutputBackend.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/decklink/DeckLinkInputBackend.cpp")
+    "${CMAKE_CURRENT_SOURCE_DIR}/decklink/DeckLinkInputBackend.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/decklink/DeckLinkNode.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/decklink/DeckLinkCaptureNode.cpp")
   list(APPEND VIDEOIO_GEN_SRCS "${DL_GEN_DIR}/DeckLinkAPI_i.c")
   list(APPEND VIDEOIO_INCS "${DL_GEN_DIR}")
   list(APPEND VIDEOIO_DEFS SCORE_HAS_DECKLINK=1)

@@ -10,13 +10,27 @@
 
 #include <verdigris>
 
+#include <memory>
+
 class QComboBox;
 class QFormLayout;
 class QSpinBox;
 class QLineEdit;
 
+namespace Video
+{
+class ExternalInput;
+}
+
 namespace Gfx::AJA
 {
+
+struct AJAInputSettings;
+
+/// CPU-staging capture factory (defined in AJAInput.cpp): opens the AJA card and
+/// returns a Video::ExternalInput feeding score's camera pipeline, or null on
+/// failure. Declared here so the unified Direct Video I/O device can reuse it.
+std::shared_ptr<::Video::ExternalInput> makeAJACapture(const AJAInputSettings&);
 
 /**
  * @brief Per-frame pixel format the AJA card delivers to score.
