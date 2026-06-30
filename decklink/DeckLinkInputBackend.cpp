@@ -11,13 +11,13 @@
 // NVIDIA-DVP GPU-direct capture via the shared shim, gated on the bridge being
 // linked (same source-side gate AJA uses). GL needs Qt OpenGL; D3D11 is WIN32.
 #if defined(SCORE_HAS_AJA_DVP_BRIDGE)
-#include <gpudirect/DmaLockPolicy.hpp>
+#include <Gfx/Graph/interop/DmaLockPolicy.hpp>
 #if QT_CONFIG(opengl)
-#include <gpudirect/DvpCaptureGl.hpp>
+#include <Gfx/Graph/interop/DvpCaptureGl.hpp>
 #define VIDEOIO_DECKLINK_DVP_GL 1
 #endif
 #if defined(_WIN32)
-#include <gpudirect/DvpCaptureD3D11.hpp>
+#include <Gfx/Graph/interop/DvpCaptureD3D11.hpp>
 #define VIDEOIO_DECKLINK_DVP_D3D11 1
 #endif
 #endif
@@ -247,14 +247,14 @@ DeckLinkInputBackend::pickStrategy(QRhi::Implementation impl)
 #if defined(VIDEOIO_DECKLINK_DVP_GL)
     case QRhi::OpenGLES2:
       return std::make_unique<
-          Gfx::gpudirect::DvpCaptureGl<Gfx::gpudirect::NoDmaLock>>(
-          Gfx::gpudirect::NoDmaLock{}, fmt, "DVP-GL");
+          score::gfx::interop::DvpCaptureGl<score::gfx::interop::NoDmaLock>>(
+          score::gfx::interop::NoDmaLock{}, fmt, "DVP-GL");
 #endif
 #if defined(VIDEOIO_DECKLINK_DVP_D3D11)
     case QRhi::D3D11:
       return std::make_unique<
-          Gfx::gpudirect::DvpCaptureD3D11<Gfx::gpudirect::NoDmaLock>>(
-          Gfx::gpudirect::NoDmaLock{}, fmt, "DVP-D3D11");
+          score::gfx::interop::DvpCaptureD3D11<score::gfx::interop::NoDmaLock>>(
+          score::gfx::interop::NoDmaLock{}, fmt, "DVP-D3D11");
 #endif
     default:
       return {};

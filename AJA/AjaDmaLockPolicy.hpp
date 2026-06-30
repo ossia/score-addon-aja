@@ -7,7 +7,7 @@ namespace Gfx::AJA
 {
 
 /**
- * @brief DMA-lock policy for the shared DVP shims (Gfx::gpudirect::Dvp*).
+ * @brief DMA-lock policy for the shared DVP shims (score::gfx::interop::Dvp*).
  *
  * Pins the DVP sysmem slot for the AJA card's DMA engine via
  * CNTV2Card::DMABufferLock (paged host-memory DMA, inRDMA=false) — the exact

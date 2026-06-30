@@ -28,14 +28,14 @@ extern "C" {
 #if defined(SCORE_HAS_AJA_DVP_BRIDGE)
 #include <AJA/AjaDmaLockPolicy.hpp>
 #if defined(_WIN32)
-#include <gpudirect/DvpCaptureD3D11.hpp>
+#include <Gfx/Graph/interop/DvpCaptureD3D11.hpp>
 #define AJA_HAS_CAPTURE_DVP_D3D11 1
 #endif
 // GL DVP ("GPUDirect for Video") is cross-platform: Windows dvp.dll,
 // Linux libdvp.so.1. sysmem DMA + dvpMemcpy into the GL texture — no
 // GPUDirect RDMA / nvidia-peermem needed, so it works on consumer GPUs.
 #if QT_CONFIG(opengl)
-#include <gpudirect/DvpCaptureGl.hpp>
+#include <Gfx/Graph/interop/DvpCaptureGl.hpp>
 #define AJA_HAS_CAPTURE_DVP_GL 1
 #endif
 #endif
@@ -315,7 +315,7 @@ pickAjaCaptureStrategy(
   // on consumer GPUs where tier-3 RDMA (DMABufferLock inRDMA=true) can't.
 #if defined(AJA_HAS_CAPTURE_DVP_D3D11)
   if(allowDvp && backend == QRhi::D3D11)
-    return std::make_unique<Gfx::gpudirect::DvpCaptureD3D11<AjaDmaLockPolicy>>(
+    return std::make_unique<score::gfx::interop::DvpCaptureD3D11<AjaDmaLockPolicy>>(
         AjaDmaLockPolicy{card},
         (pixfmt == AJAInputPixelFormat::ARGB) ? NV_DVP_FORMAT_BGRA8
                                               : NV_DVP_FORMAT_RGBA8,
@@ -323,7 +323,7 @@ pickAjaCaptureStrategy(
 #endif
 #if defined(AJA_HAS_CAPTURE_DVP_GL)
   if(allowDvp && backend == QRhi::OpenGLES2)
-    return std::make_unique<Gfx::gpudirect::DvpCaptureGl<AjaDmaLockPolicy>>(
+    return std::make_unique<score::gfx::interop::DvpCaptureGl<AjaDmaLockPolicy>>(
         AjaDmaLockPolicy{card},
         (pixfmt == AJAInputPixelFormat::ARGB) ? NV_DVP_FORMAT_BGRA8
                                               : NV_DVP_FORMAT_RGBA8,

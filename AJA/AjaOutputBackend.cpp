@@ -25,11 +25,11 @@ extern "C" {
 #include <AJA/AjaDmaLockPolicy.hpp>
 #include <AJA/AjaDvpEncoder.hpp>
 #if defined(_WIN32)
-#include <gpudirect/DvpOutputD3D11.hpp>
+#include <Gfx/Graph/interop/DvpOutputD3D11.hpp>
 #define AJA_HAS_DVP_D3D11 1
 #endif
 #if QT_CONFIG(opengl)
-#include <gpudirect/DvpOutputGl.hpp>
+#include <Gfx/Graph/interop/DvpOutputGl.hpp>
 #define AJA_HAS_DVP_GL 1
 #endif
 #endif
@@ -231,7 +231,7 @@ AjaOutputBackend::gpuDirectCandidates(QRhi* rhi, score::gfx::GraphicsApi api)
 #if defined(AJA_HAS_DVP_D3D11)
     if(api == score::gfx::GraphicsApi::D3D11)
       candidates.push_back([card, fbf] {
-        return std::make_unique<Gfx::gpudirect::DvpOutputD3D11<AjaDmaLockPolicy>>(
+        return std::make_unique<score::gfx::interop::DvpOutputD3D11<AjaDmaLockPolicy>>(
             AjaDmaLockPolicy{card},
             [fbf] { return ajaMakeFragmentEncoder(fbf); },
             [fbf](score::gfx::GPUVideoEncoder* e) {
@@ -243,7 +243,7 @@ AjaOutputBackend::gpuDirectCandidates(QRhi* rhi, score::gfx::GraphicsApi api)
 #if defined(AJA_HAS_DVP_GL)
     if(api == score::gfx::GraphicsApi::OpenGL)
       candidates.push_back([card, fbf] {
-        return std::make_unique<Gfx::gpudirect::DvpOutputGl<AjaDmaLockPolicy>>(
+        return std::make_unique<score::gfx::interop::DvpOutputGl<AjaDmaLockPolicy>>(
             AjaDmaLockPolicy{card},
             [fbf] { return ajaMakeFragmentEncoder(fbf); },
             [fbf](score::gfx::GPUVideoEncoder* e) {

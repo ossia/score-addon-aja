@@ -26,13 +26,9 @@ set(VIDEOIO_HDRS
   "${CMAKE_CURRENT_SOURCE_DIR}/VideoIOCaps.hpp"
   "${CMAKE_CURRENT_SOURCE_DIR}/VideoOutput.hpp"
   "${CMAKE_CURRENT_SOURCE_DIR}/VideoInput.hpp"
-  # Shared, vendor-neutral NVIDIA-DVP shim templates (parameterized by a
-  # per-vendor DMA-lock policy). Header-only; consumed by AJA + DeckLink.
-  "${CMAKE_CURRENT_SOURCE_DIR}/gpudirect/DmaLockPolicy.hpp"
-  "${CMAKE_CURRENT_SOURCE_DIR}/gpudirect/DvpCaptureGl.hpp"
-  "${CMAKE_CURRENT_SOURCE_DIR}/gpudirect/DvpCaptureD3D11.hpp"
-  "${CMAKE_CURRENT_SOURCE_DIR}/gpudirect/DvpOutputGl.hpp"
-  "${CMAKE_CURRENT_SOURCE_DIR}/gpudirect/DvpOutputD3D11.hpp"
+  # NOTE: the shared, vendor-neutral NVIDIA-DVP shim templates now live in
+  # score-plugin-gfx (Gfx/Graph/interop/Dvp{Capture,Output}{Gl,D3D11}.hpp +
+  # DmaLockPolicy.hpp); AJA/DeckLink consume them from there.
 )
 set(VIDEOIO_GEN_SRCS "")
 set(VIDEOIO_DEFS "")
