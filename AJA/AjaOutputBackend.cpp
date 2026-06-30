@@ -22,12 +22,14 @@ extern "C" {
 #define AJA_HAS_RDMA_GL 1
 #endif
 #if defined(SCORE_HAS_AJA_DVP_BRIDGE)
+#include <AJA/AjaDmaLockPolicy.hpp>
+#include <AJA/AjaDvpEncoder.hpp>
 #if defined(_WIN32)
-#include <AJA/RdmaInteropD3D11Dvp.hpp>
+#include <gpudirect/DvpOutputD3D11.hpp>
 #define AJA_HAS_DVP_D3D11 1
 #endif
 #if QT_CONFIG(opengl)
-#include <AJA/RdmaInteropGLDvp.hpp>
+#include <gpudirect/DvpOutputGl.hpp>
 #define AJA_HAS_DVP_GL 1
 #endif
 #endif
@@ -228,11 +230,27 @@ AjaOutputBackend::gpuDirectCandidates(QRhi* rhi, score::gfx::GraphicsApi api)
   {
 #if defined(AJA_HAS_DVP_D3D11)
     if(api == score::gfx::GraphicsApi::D3D11)
-      candidates.push_back([card, fbf] { return std::make_unique<RdmaInteropD3D11Dvp>(card, fbf); });
+      candidates.push_back([card, fbf] {
+        return std::make_unique<Gfx::gpudirect::DvpOutputD3D11<AjaDmaLockPolicy>>(
+            AjaDmaLockPolicy{card},
+            [fbf] { return ajaMakeFragmentEncoder(fbf); },
+            [fbf](score::gfx::GPUVideoEncoder* e) {
+              return ajaEncoderOutputTexture(e, fbf);
+            },
+            "DVP-D3D11");
+      });
 #endif
 #if defined(AJA_HAS_DVP_GL)
     if(api == score::gfx::GraphicsApi::OpenGL)
-      candidates.push_back([card, fbf] { return std::make_unique<RdmaInteropGLDvp>(card, fbf); });
+      candidates.push_back([card, fbf] {
+        return std::make_unique<Gfx::gpudirect::DvpOutputGl<AjaDmaLockPolicy>>(
+            AjaDmaLockPolicy{card},
+            [fbf] { return ajaMakeFragmentEncoder(fbf); },
+            [fbf](score::gfx::GPUVideoEncoder* e) {
+              return ajaEncoderOutputTexture(e, fbf);
+            },
+            "DVP-GL");
+      });
 #endif
   }
   // Tier-3 RDMA (Linux; on Windows these init() to false).
