@@ -32,6 +32,12 @@
 #include <decklink/DeckLinkNode.hpp>
 #endif
 
+#if defined(SCORE_HAS_DELTACAST)
+#include <deltacast/DeltacastDevices.hpp>
+#include <deltacast/DeltacastFormats.hpp>
+#include <deltacast/DeltacastNode.hpp>
+#endif
+
 W_OBJECT_IMPL(Gfx::VideoIO::VideoOutputDevice)
 
 namespace Gfx::VideoIO
@@ -88,6 +94,17 @@ Gfx::DeckLink::DeckLinkOutputSettings toDeckLink(const VideoOutputSettings& s)
   d.deviceIndex = s.deviceIndex;
   d.displayMode = Gfx::DeckLink::bmdModeFromToken(s.videoFormat);
   d.pixelFormat = Gfx::DeckLink::bmdPixelFromToken(s.pixelFormat);
+  return d;
+}
+#endif
+
+#if defined(SCORE_HAS_DELTACAST)
+Gfx::Deltacast::DeltacastOutputSettings toDeltacast(const VideoOutputSettings& s)
+{
+  Gfx::Deltacast::DeltacastOutputSettings d;
+  d.deviceIndex = s.deviceIndex;
+  d.videoStandard = Gfx::Deltacast::vhdStandardFromToken(s.videoFormat);
+  d.bufferPacking = Gfx::Deltacast::vhdPackingFromToken(s.pixelFormat);
   return d;
 }
 #endif
@@ -211,6 +228,11 @@ bool VideoOutputDevice::reconnect()
           node = new Gfx::DeckLink::DeckLinkNode{toDeckLink(set)};
 #endif
           break;
+        case Vendor::Deltacast:
+#if defined(SCORE_HAS_DELTACAST)
+          node = new Gfx::Deltacast::DeltacastNode{toDeltacast(set)};
+#endif
+          break;
       }
 
       if(!node)
@@ -258,6 +280,9 @@ VideoOutputSettingsWidget::VideoOutputSettingsWidget(QWidget* parent)
 #endif
 #if defined(SCORE_HAS_DECKLINK)
   m_vendorCombo->addItem("Blackmagic DeckLink", static_cast<int>(Vendor::DeckLink));
+#endif
+#if defined(SCORE_HAS_DELTACAST)
+  m_vendorCombo->addItem("DELTACAST", static_cast<int>(Vendor::Deltacast));
 #endif
   m_layout->addRow(tr("Vendor"), m_vendorCombo);
 
@@ -349,9 +374,9 @@ void VideoOutputSettingsWidget::onVendorChanged()
 void VideoOutputSettingsWidget::refreshDeviceList()
 {
   m_deviceCombo->clear();
-  const bool isAja = currentVendor() == Vendor::AJA;
+  const Vendor vendor = currentVendor();
 
-  if(isAja)
+  if(vendor == Vendor::AJA)
   {
 #if defined(SCORE_HAS_AJA)
     CNTV2DeviceScanner scanner;
@@ -365,9 +390,9 @@ void VideoOutputSettingsWidget::refreshDeviceList()
     }
 #endif
   }
-  else
-  {
 #if defined(SCORE_HAS_DECKLINK)
+  else if(vendor == Vendor::DeckLink)
+  {
     Gfx::DeckLink::ensureComInit();
     for(const auto& dev : Gfx::DeckLink::enumerateDevices())
     {
@@ -375,8 +400,20 @@ void VideoOutputSettingsWidget::refreshDeviceList()
         m_deviceCombo->addItem(
             QString::fromStdString(dev.displayName), dev.index);
     }
-#endif
   }
+#endif
+#if defined(SCORE_HAS_DELTACAST)
+  else if(vendor == Vendor::Deltacast)
+  {
+    Gfx::Deltacast::ensureVhdInit();
+    for(const auto& dev : Gfx::Deltacast::enumerateDevices())
+    {
+      if(dev.canOutput)
+        m_deviceCombo->addItem(
+            QString::fromStdString(dev.displayName), dev.index);
+    }
+  }
+#endif
 
   if(m_deviceCombo->count() == 0)
   {
@@ -604,6 +641,33 @@ public:
   }
 };
 #endif
+
+#if defined(SCORE_HAS_DELTACAST)
+class DeltacastVideoOutputEnumerator final : public Device::DeviceEnumerator
+{
+public:
+  void enumerate(
+      std::function<void(const QString&, const Device::DeviceSettings&)> func)
+      const override
+  {
+    Gfx::Deltacast::ensureVhdInit();
+    for(const auto& dev : Gfx::Deltacast::enumerateDevices())
+    {
+      if(!dev.canOutput)
+        continue;
+      Device::DeviceSettings s;
+      s.name = QString::fromStdString(dev.displayName);
+      s.protocol = VideoOutputProtocolFactory::static_concreteKey();
+      VideoOutputSettings set;
+      set.vendor = Vendor::Deltacast;
+      set.deviceName = s.name;
+      set.deviceIndex = dev.index;
+      s.deviceSpecificSettings = QVariant::fromValue(set);
+      func(s.name, s);
+    }
+  }
+};
+#endif
 } // namespace
 
 Device::DeviceEnumerators
@@ -615,6 +679,9 @@ VideoOutputProtocolFactory::getEnumerators(const score::DocumentContext&) const
 #endif
 #if defined(SCORE_HAS_DECKLINK)
   e.push_back({"DeckLink", new DeckLinkVideoOutputEnumerator});
+#endif
+#if defined(SCORE_HAS_DELTACAST)
+  e.push_back({"DELTACAST", new DeltacastVideoOutputEnumerator});
 #endif
   return e;
 }

@@ -35,6 +35,12 @@
 #include <decklink/DeckLinkModeMap.hpp>
 #endif
 
+#if defined(SCORE_HAS_DELTACAST)
+#include <deltacast/DeltacastCaptureNode.hpp>
+#include <deltacast/DeltacastDevices.hpp>
+#include <deltacast/DeltacastFormats.hpp>
+#endif
+
 W_OBJECT_IMPL(Gfx::VideoIO::VideoInputDevice)
 
 namespace Gfx::VideoIO
@@ -73,6 +79,19 @@ Gfx::DeckLink::DeckLinkInputSettings toDeckLinkInput(const VideoInputSettings& s
   d.deviceIndex = s.deviceIndex;
   d.displayMode = Gfx::DeckLink::bmdModeFromToken(s.videoFormat);
   d.pixelFormat = Gfx::DeckLink::bmdPixelFromToken(s.pixelFormat);
+  return d;
+}
+#endif
+
+#if defined(SCORE_HAS_DELTACAST)
+Gfx::Deltacast::DeltacastInputSettings toDeltacastInput(const VideoInputSettings& s)
+{
+  Gfx::Deltacast::DeltacastInputSettings d;
+  d.deviceIndex = s.deviceIndex;
+  // 0 = auto-detect the incoming standard (the RX signal drives the geometry);
+  // the widget's "expected format" is only a UI hint for capture.
+  d.videoStandard = 0;
+  d.bufferPacking = Gfx::Deltacast::vhdPackingFromToken(s.pixelFormat);
   return d;
 }
 #endif
@@ -243,6 +262,19 @@ bool VideoInputDevice::reconnect()
 #endif
         break;
       }
+      case Vendor::Deltacast:
+      {
+#if defined(SCORE_HAS_DELTACAST)
+        registerGpuDirect(
+            new Gfx::Deltacast::DeltacastCaptureNode{toDeltacastInput(set)});
+        qDebug() << "Direct Video Input: DELTACAST host-staged node";
+        return connected();
+#else
+        qDebug() << "Direct Video Input: DELTACAST not compiled in";
+        return false;
+#endif
+        break;
+      }
     }
   }
   catch(std::exception& e)
@@ -275,6 +307,9 @@ VideoInputSettingsWidget::VideoInputSettingsWidget(QWidget* parent)
 #endif
 #if defined(SCORE_HAS_DECKLINK)
   m_vendorCombo->addItem("Blackmagic DeckLink", static_cast<int>(Vendor::DeckLink));
+#endif
+#if defined(SCORE_HAS_DELTACAST)
+  m_vendorCombo->addItem("DELTACAST", static_cast<int>(Vendor::Deltacast));
 #endif
   m_layout->addRow(tr("Vendor"), m_vendorCombo);
 
@@ -354,7 +389,8 @@ void VideoInputSettingsWidget::onVendorChanged()
 void VideoInputSettingsWidget::refreshDeviceList()
 {
   m_deviceCombo->clear();
-  if(currentVendor() == Vendor::AJA)
+  const Vendor vendor = currentVendor();
+  if(vendor == Vendor::AJA)
   {
 #if defined(SCORE_HAS_AJA)
     CNTV2DeviceScanner scanner;
@@ -367,16 +403,26 @@ void VideoInputSettingsWidget::refreshDeviceList()
     }
 #endif
   }
-  else
-  {
 #if defined(SCORE_HAS_DECKLINK)
+  else if(vendor == Vendor::DeckLink)
+  {
     Gfx::DeckLink::ensureComInit();
     for(const auto& dev : Gfx::DeckLink::enumerateDevices())
       if(dev.canInput)
         m_deviceCombo->addItem(
             QString::fromStdString(dev.displayName), dev.index);
-#endif
   }
+#endif
+#if defined(SCORE_HAS_DELTACAST)
+  else if(vendor == Vendor::Deltacast)
+  {
+    Gfx::Deltacast::ensureVhdInit();
+    for(const auto& dev : Gfx::Deltacast::enumerateDevices())
+      if(dev.canInput)
+        m_deviceCombo->addItem(
+            QString::fromStdString(dev.displayName), dev.index);
+  }
+#endif
   if(m_deviceCombo->count() == 0)
     m_deviceCombo->addItem(tr("(no device detected)"), -1);
 }
@@ -516,6 +562,33 @@ public:
   }
 };
 #endif
+
+#if defined(SCORE_HAS_DELTACAST)
+class DeltacastVideoInputEnumerator final : public Device::DeviceEnumerator
+{
+public:
+  void enumerate(
+      std::function<void(const QString&, const Device::DeviceSettings&)> func)
+      const override
+  {
+    Gfx::Deltacast::ensureVhdInit();
+    for(const auto& dev : Gfx::Deltacast::enumerateDevices())
+    {
+      if(!dev.canInput)
+        continue;
+      Device::DeviceSettings s;
+      s.name = QString::fromStdString(dev.displayName);
+      s.protocol = VideoInputProtocolFactory::static_concreteKey();
+      VideoInputSettings set;
+      set.vendor = Vendor::Deltacast;
+      set.deviceName = s.name;
+      set.deviceIndex = dev.index;
+      s.deviceSpecificSettings = QVariant::fromValue(set);
+      func(s.name, s);
+    }
+  }
+};
+#endif
 } // namespace
 
 Device::DeviceEnumerators
@@ -527,6 +600,9 @@ VideoInputProtocolFactory::getEnumerators(const score::DocumentContext&) const
 #endif
 #if defined(SCORE_HAS_DECKLINK)
   e.push_back({"DeckLink", new DeckLinkVideoInputEnumerator});
+#endif
+#if defined(SCORE_HAS_DELTACAST)
+  e.push_back({"DELTACAST", new DeltacastVideoInputEnumerator});
 #endif
   return e;
 }

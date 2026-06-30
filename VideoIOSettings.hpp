@@ -16,7 +16,8 @@ namespace Gfx::VideoIO
 enum class Vendor : int
 {
   AJA = 0,
-  DeckLink = 1
+  DeckLink = 1,
+  Deltacast = 2
 };
 
 /// Vendor-neutral playout settings. Vendor-specific knobs are carried as plain

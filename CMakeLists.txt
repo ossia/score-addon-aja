@@ -134,6 +134,36 @@ else()
   message(STATUS "score-addon-videoio: DeckLink disabled (need WIN32 + widl + SDK)")
 endif()
 
+# --- DELTACAST VideoMaster ---------------------------------------------------
+# Plain C headers + import lib (no codegen). Host-staged v1; RDMA (Seam B) later.
+set(DELTACAST_SDK_ROOT "c:/dev/deltacast/videomaster" CACHE PATH "DELTACAST VideoMaster SDK root")
+if(WIN32 AND EXISTS "${DELTACAST_SDK_ROOT}/resources/include/VideoMasterHD_Core.h"
+   AND EXISTS "${DELTACAST_SDK_ROOT}/resources/lib/VideoMasterHD.lib")
+  list(APPEND VIDEOIO_HDRS
+    "${CMAKE_CURRENT_SOURCE_DIR}/deltacast/Deltacast.hpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/deltacast/DeltacastFormats.hpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/deltacast/DeltacastDevices.hpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/deltacast/DeltacastCpuCapture.hpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/deltacast/DeltacastOutputBackend.hpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/deltacast/DeltacastInputBackend.hpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/deltacast/DeltacastNode.hpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/deltacast/DeltacastCaptureNode.hpp")
+  list(APPEND VIDEOIO_SRCS
+    "${CMAKE_CURRENT_SOURCE_DIR}/deltacast/DeltacastDevices.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/deltacast/DeltacastOutputBackend.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/deltacast/DeltacastInputBackend.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/deltacast/DeltacastNode.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/deltacast/DeltacastCaptureNode.cpp")
+  list(APPEND VIDEOIO_INCS "${DELTACAST_SDK_ROOT}/resources/include")
+  list(APPEND VIDEOIO_DEFS SCORE_HAS_DELTACAST=1)
+  set(VIDEOIO_DELTACAST_LIB "${DELTACAST_SDK_ROOT}/resources/lib/VideoMasterHD.lib")
+  set(VIDEOIO_DELTACAST_DLL "${DELTACAST_SDK_ROOT}/resources/lib/VideoMasterHD.dll")
+  set(VIDEOIO_HAS_DELTACAST TRUE)
+  message(STATUS "score-addon-videoio: DELTACAST enabled (SDK: ${DELTACAST_SDK_ROOT})")
+else()
+  message(STATUS "score-addon-videoio: DELTACAST disabled (need WIN32 + VideoMaster SDK)")
+endif()
+
 # ---------------------------------------------------------------------------
 add_library(${PROJECT_NAME}
   ${VIDEOIO_SRCS} ${VIDEOIO_HDRS} ${VIDEOIO_GEN_SRCS})
@@ -178,6 +208,18 @@ if(VIDEOIO_HAS_AJA)
           "$<TARGET_FILE_DIR:${PROJECT_NAME}>/dvp.dll"
         COMMENT "Copying dvp.dll alongside ${PROJECT_NAME}")
     endif()
+  endif()
+endif()
+
+# --- DELTACAST link ----------------------------------------------------------
+if(VIDEOIO_HAS_DELTACAST)
+  target_link_libraries(${PROJECT_NAME} PRIVATE "${VIDEOIO_DELTACAST_LIB}")
+  if(WIN32 AND EXISTS "${VIDEOIO_DELTACAST_DLL}")
+    add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
+      COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "${VIDEOIO_DELTACAST_DLL}"
+        "$<TARGET_FILE_DIR:${PROJECT_NAME}>/VideoMasterHD.dll"
+      COMMENT "Copying VideoMasterHD.dll alongside ${PROJECT_NAME}")
   endif()
 endif()
 
