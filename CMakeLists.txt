@@ -144,6 +144,7 @@ if(WIN32 AND EXISTS "${DELTACAST_SDK_ROOT}/resources/include/VideoMasterHD_Core.
     "${CMAKE_CURRENT_SOURCE_DIR}/deltacast/DeltacastFormats.hpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/deltacast/DeltacastDevices.hpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/deltacast/DeltacastCpuCapture.hpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/deltacast/DeltacastRdmaCapture.hpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/deltacast/DeltacastOutputBackend.hpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/deltacast/DeltacastInputBackend.hpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/deltacast/DeltacastNode.hpp"

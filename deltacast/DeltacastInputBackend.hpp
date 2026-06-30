@@ -4,6 +4,7 @@
 #include <Gfx/Graph/DMACaptureInputNode.hpp>
 
 #include <atomic>
+#include <array>
 #include <cstdint>
 #include <thread>
 
@@ -14,12 +15,14 @@ struct GpuDirectCaptureSlotRing;
 
 namespace Gfx::Deltacast
 {
+struct DeltacastRdmaCapture;
 
 struct DeltacastInputSettings
 {
   int deviceIndex{0};
   ULONG videoStandard{0}; ///< 0 = auto-detect the incoming standard
   ULONG bufferPacking{VHD_BUFPACK_VIDEO_YUV422_8};
+  bool useRDMA{true};     ///< Try the RDMA GPU-direct path (Vulkan+CUDA) first.
 };
 
 /**
@@ -47,21 +50,17 @@ public:
   std::unique_ptr<score::gfx::GPUVideoDecoder>
   makeDecoder(Video::VideoMetadata& meta) override;
   std::unique_ptr<score::gfx::interop::GpuDirectCaptureStrategy>
-  pickStrategy(QRhi::Implementation) override
-  {
-    return {}; // host-staged only for now
-  }
+  pickStrategy(QRhi::Implementation) override;
   std::unique_ptr<score::gfx::interop::GpuDirectCaptureStrategy>
   makeCpuStrategy() override;
-  void setStrategy(score::gfx::interop::GpuDirectCaptureStrategy* s) noexcept override
-  {
-    m_strategy = s;
-  }
+  void setStrategy(score::gfx::interop::GpuDirectCaptureStrategy* s) noexcept override;
   void start() override;
   void stop() override;
 
 private:
-  void runLoop();
+  void runLoop();      ///< Host-staged reception loop (VHD_Lock/Get/Unlock).
+  void runLoopRdma();  ///< RDMA reception loop (VHD_QueueInSlot/WaitSlotFilled).
+  bool rdmaActive() const noexcept; ///< True once an RDMA strategy is bound.
 
   DeltacastInputSettings m_settings;
   score::gfx::interop::GpuDirectCaptureSlotRing& m_ring;
@@ -70,6 +69,13 @@ private:
   HANDLE m_stream{nullptr};
   score::gfx::interop::GpuDirectCaptureStrategy* m_strategy{};
 
+  // RDMA path: the strategy created by pickStrategy (also the bound strategy
+  // unless its init() failed and the node swapped in a CPU fallback). Used to
+  // detect RDMA mode + read slotBuffer(i) for VHD_CreateSlotEx.
+  DeltacastRdmaCapture* m_rdmaStrategy{};
+  static constexpr std::size_t kRdmaSlotCount = 3;
+  std::array<HANDLE, kRdmaSlotCount> m_vhdSlots{};
+
   std::thread m_thread;
   std::atomic<bool> m_running{false};
 
@@ -77,6 +83,7 @@ private:
   int m_height{};
   uint32_t m_frameByteSize{};
   bool m_started{};
+  bool m_streamStarted{}; ///< Whether VHD_StartStream succeeded (RDMA defers it).
 };
 
 } // namespace Gfx::Deltacast
