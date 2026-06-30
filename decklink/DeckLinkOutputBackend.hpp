@@ -51,12 +51,16 @@ public:
   std::vector<std::function<std::unique_ptr<score::gfx::interop::GpuDirectStrategy>()>>
   gpuDirectCandidates(QRhi*, score::gfx::GraphicsApi) override
   {
-    // host-staged only for now. Output DVP can reuse the shared
-    // Gfx::gpudirect::DvpOutput{Gl,D3D11} templates (with a NoDmaLock policy +
-    // encoder closures); the remaining work is scheduling the DVP sysmem as a
-    // DeckLink frame. Deferred to a later pass.
+    // No single-buffer GPU-direct strategy: DeckLink's async scheduled playback
+    // needs a frame ring, which the host-staged path provides. Output DVP is
+    // engaged via prefersGpuDownload() -> HostStagedOutput's HostPinnedRing.
     return {};
   }
+  /// Opt into the GPU-direct (DVP) download in HostStagedOutput: the encoder
+  /// texture is DMA'd straight into the pinned ring slots (each wrapped as a
+  /// DeckLink frame via registrar()), skipping the QRhi readback. Falls back to
+  /// CPU readback when no DVP backend is present.
+  bool prefersGpuDownload() const noexcept override;
   score::gfx::interop::PacedFramePump::Hooks pacingHooks() override;
 
   /// Released by the completion callback (one permit per freed output slot).

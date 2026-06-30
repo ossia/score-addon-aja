@@ -263,6 +263,15 @@ score::gfx::interop::VendorDmaRegistrar DeckLinkOutputBackend::registrar()
   return reg;
 }
 
+bool DeckLinkOutputBackend::prefersGpuDownload() const noexcept
+{
+#if defined(SCORE_HAS_AJA_DVP_BRIDGE)
+  return true; // nv_dvp_bridge linked: HostStagedOutput can DVP texture->sysmem
+#else
+  return false;
+#endif
+}
+
 score::gfx::interop::PacedFramePump::Hooks DeckLinkOutputBackend::pacingHooks()
 {
   score::gfx::interop::PacedFramePump::Hooks h;
