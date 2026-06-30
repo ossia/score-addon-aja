@@ -52,6 +52,19 @@ parseAjaVideoFormat(const QString& format, double /*rate*/) noexcept
       {"UHD50", NTV2_FORMAT_4x1920x1080p_5000},
       {"UHD5994", NTV2_FORMAT_4x1920x1080p_5994},
       {"UHD60", NTV2_FORMAT_4x1920x1080p_6000},
+      // Neutral "2160pXX" tokens emitted by the unified Direct Video I/O widget
+      // (vendor-agnostic spelling; DeckLink reads them as single-link 4K). For
+      // AJA they alias the quad-link UHD formats — the topology the old AJA
+      // widget used and that retail Kona firmware supports without a 12G profile.
+      // The capability filter hides any a given card can't do.
+      {"2160p2398", NTV2_FORMAT_4x1920x1080p_2398},
+      {"2160p24", NTV2_FORMAT_4x1920x1080p_2400},
+      {"2160p25", NTV2_FORMAT_4x1920x1080p_2500},
+      {"2160p2997", NTV2_FORMAT_4x1920x1080p_2997},
+      {"2160p30", NTV2_FORMAT_4x1920x1080p_3000},
+      {"2160p50", NTV2_FORMAT_4x1920x1080p_5000},
+      {"2160p5994", NTV2_FORMAT_4x1920x1080p_5994},
+      {"2160p60", NTV2_FORMAT_4x1920x1080p_6000},
       // Single-link 4K UHD (one 12G cable; requires CanDo12gRouting).
       {"UHD_SL_2398", NTV2_FORMAT_3840x2160p_2398},
       {"UHD_SL_24", NTV2_FORMAT_3840x2160p_2400},
