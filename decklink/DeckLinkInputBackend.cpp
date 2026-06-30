@@ -8,6 +8,20 @@
 #include <Gfx/Graph/interop/GpuDirectCaptureStrategy.hpp>
 #include <Gfx/Graph/interop/VideoPixelFormatAV.hpp>
 
+// NVIDIA-DVP GPU-direct capture via the shared shim, gated on the bridge being
+// linked (same source-side gate AJA uses). GL needs Qt OpenGL; D3D11 is WIN32.
+#if defined(SCORE_HAS_AJA_DVP_BRIDGE)
+#include <gpudirect/DmaLockPolicy.hpp>
+#if QT_CONFIG(opengl)
+#include <gpudirect/DvpCaptureGl.hpp>
+#define VIDEOIO_DECKLINK_DVP_GL 1
+#endif
+#if defined(_WIN32)
+#include <gpudirect/DvpCaptureD3D11.hpp>
+#define VIDEOIO_DECKLINK_DVP_D3D11 1
+#endif
+#endif
+
 #include <Video/VideoInterface.hpp>
 
 #include <QDebug>
@@ -36,6 +50,16 @@ int rowBytesFor(BMDPixelFormat f, int w) noexcept
     default:                   return w * 4;
   }
 }
+
+#if defined(VIDEOIO_DECKLINK_DVP_GL) || defined(VIDEOIO_DECKLINK_DVP_D3D11)
+/// DVP texel format of the decode-input texture for a DeckLink wire format.
+/// BGRA is the only byte-swapped 4-byte layout; everything else (UYVY/v210/...)
+/// decodes through an RGBA8 texture.
+NvDvpFormat deckLinkDvpFormat(BMDPixelFormat f) noexcept
+{
+  return (f == bmdFormat8BitBGRA) ? NV_DVP_FORMAT_BGRA8 : NV_DVP_FORMAT_RGBA8;
+}
+#endif
 
 /// Copies each arrived frame into the capture strategy's next slot and publishes
 /// it in the node's slot ring (the SDK owns this callback thread).
@@ -207,6 +231,38 @@ std::unique_ptr<score::gfx::interop::GpuDirectCaptureStrategy>
 DeckLinkInputBackend::makeCpuStrategy()
 {
   return std::make_unique<DeckLinkCpuCapture>();
+}
+
+std::unique_ptr<score::gfx::interop::GpuDirectCaptureStrategy>
+DeckLinkInputBackend::pickStrategy(QRhi::Implementation impl)
+{
+  // NVIDIA-DVP GPU-direct via the shared shim. The InputCallback CPU-memcpies
+  // each frame into the strategy's slot buffer (no card DMA into sysmem), so
+  // the no-op DMA-lock policy is correct. GL + D3D11 only; other backends fall
+  // back to the host-staged DeckLinkCpuCapture (makeCpuStrategy).
+#if defined(VIDEOIO_DECKLINK_DVP_GL) || defined(VIDEOIO_DECKLINK_DVP_D3D11)
+  const NvDvpFormat fmt = deckLinkDvpFormat(m_settings.pixelFormat);
+  switch(impl)
+  {
+#if defined(VIDEOIO_DECKLINK_DVP_GL)
+    case QRhi::OpenGLES2:
+      return std::make_unique<
+          Gfx::gpudirect::DvpCaptureGl<Gfx::gpudirect::NoDmaLock>>(
+          Gfx::gpudirect::NoDmaLock{}, fmt, "DVP-GL");
+#endif
+#if defined(VIDEOIO_DECKLINK_DVP_D3D11)
+    case QRhi::D3D11:
+      return std::make_unique<
+          Gfx::gpudirect::DvpCaptureD3D11<Gfx::gpudirect::NoDmaLock>>(
+          Gfx::gpudirect::NoDmaLock{}, fmt, "DVP-D3D11");
+#endif
+    default:
+      return {};
+  }
+#else
+  (void)impl;
+  return {};
+#endif
 }
 
 void DeckLinkInputBackend::start()

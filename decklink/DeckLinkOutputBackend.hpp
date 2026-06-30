@@ -51,7 +51,11 @@ public:
   std::vector<std::function<std::unique_ptr<score::gfx::interop::GpuDirectStrategy>()>>
   gpuDirectCandidates(QRhi*, score::gfx::GraphicsApi) override
   {
-    return {}; // host-staged only for now; DVP (GL/D3D11) is a later pass
+    // host-staged only for now. Output DVP can reuse the shared
+    // Gfx::gpudirect::DvpOutput{Gl,D3D11} templates (with a NoDmaLock policy +
+    // encoder closures); the remaining work is scheduling the DVP sysmem as a
+    // DeckLink frame. Deferred to a later pass.
+    return {};
   }
   score::gfx::interop::PacedFramePump::Hooks pacingHooks() override;
 

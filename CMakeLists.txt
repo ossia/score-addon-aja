@@ -25,6 +25,13 @@ set(VIDEOIO_HDRS
   "${CMAKE_CURRENT_SOURCE_DIR}/VideoIOSettings.hpp"
   "${CMAKE_CURRENT_SOURCE_DIR}/VideoOutput.hpp"
   "${CMAKE_CURRENT_SOURCE_DIR}/VideoInput.hpp"
+  # Shared, vendor-neutral NVIDIA-DVP shim templates (parameterized by a
+  # per-vendor DMA-lock policy). Header-only; consumed by AJA + DeckLink.
+  "${CMAKE_CURRENT_SOURCE_DIR}/gpudirect/DmaLockPolicy.hpp"
+  "${CMAKE_CURRENT_SOURCE_DIR}/gpudirect/DvpCaptureGl.hpp"
+  "${CMAKE_CURRENT_SOURCE_DIR}/gpudirect/DvpCaptureD3D11.hpp"
+  "${CMAKE_CURRENT_SOURCE_DIR}/gpudirect/DvpOutputGl.hpp"
+  "${CMAKE_CURRENT_SOURCE_DIR}/gpudirect/DvpOutputD3D11.hpp"
 )
 set(VIDEOIO_GEN_SRCS "")
 set(VIDEOIO_DEFS "")
@@ -60,6 +67,8 @@ if(EXISTS "${VIDEOIO_AJA_SDK_ROOT}/ajantv2/includes/ntv2card.h")
     "${CMAKE_CURRENT_SOURCE_DIR}/AJA/AjaFormatMap.hpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/AJA/AjaOutputBackend.hpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/AJA/AjaDmaLock.hpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/AJA/AjaDmaLockPolicy.hpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/AJA/AjaDvpEncoder.hpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/AJA/CaptureInteropCpu.hpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/AJA/CaptureInteropD3D11Dvp.hpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/AJA/CaptureInteropD3D11Tier3.hpp"

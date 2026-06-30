@@ -45,10 +45,7 @@ public:
   std::unique_ptr<score::gfx::GPUVideoDecoder>
   makeDecoder(Video::VideoMetadata& meta) override;
   std::unique_ptr<score::gfx::interop::GpuDirectCaptureStrategy>
-  pickStrategy(QRhi::Implementation) override
-  {
-    return {}; // host-staged only for now
-  }
+  pickStrategy(QRhi::Implementation impl) override;
   std::unique_ptr<score::gfx::interop::GpuDirectCaptureStrategy>
   makeCpuStrategy() override;
   void setStrategy(score::gfx::interop::GpuDirectCaptureStrategy* s) noexcept override
