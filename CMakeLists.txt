@@ -23,6 +23,7 @@ set(VIDEOIO_SRCS
 set(VIDEOIO_HDRS
   "${CMAKE_CURRENT_SOURCE_DIR}/score_addon_videoio.hpp"
   "${CMAKE_CURRENT_SOURCE_DIR}/VideoIOSettings.hpp"
+  "${CMAKE_CURRENT_SOURCE_DIR}/VideoIOCaps.hpp"
   "${CMAKE_CURRENT_SOURCE_DIR}/VideoOutput.hpp"
   "${CMAKE_CURRENT_SOURCE_DIR}/VideoInput.hpp"
   # Shared, vendor-neutral NVIDIA-DVP shim templates (parameterized by a

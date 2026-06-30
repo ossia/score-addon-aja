@@ -7,6 +7,8 @@
 
 #include <score/serialization/MimeVisitor.hpp>
 
+#include <VideoIOCaps.hpp>
+
 #include <ossia/network/generic/generic_device.hpp>
 
 #include <QComboBox>
@@ -285,13 +287,6 @@ VideoInputSettingsWidget::VideoInputSettingsWidget(QWidget* parent)
   m_layout->addRow(tr("Channel"), m_channelCombo);
 
   m_formatCombo = new QComboBox{this};
-  for(const auto& f : {"720p5994",  "720p60",    "1080p2398", "1080p24",
-                       "1080p25",   "1080p2997", "1080p30",   "1080p50",
-                       "1080p5994", "1080p60",   "1080i50",   "1080i5994",
-                       "1080i60",   "2160p25",   "2160p2997", "2160p30",
-                       "2160p50",   "2160p5994", "2160p60"})
-    m_formatCombo->addItem(QString::fromLatin1(f));
-  m_formatCombo->setCurrentText("1080p5994");
   m_layout->addRow(tr("Expected format"), m_formatCombo);
 
   m_pixelFormatCombo = new QComboBox{this};
@@ -312,6 +307,9 @@ VideoInputSettingsWidget::VideoInputSettingsWidget(QWidget* parent)
   connect(
       m_vendorCombo, qOverload<int>(&QComboBox::currentIndexChanged), this,
       [this](int) { onVendorChanged(); });
+  connect(
+      m_deviceCombo, qOverload<int>(&QComboBox::currentIndexChanged), this,
+      [this](int) { updateFormatList(); });
 
   onVendorChanged();
 }
@@ -350,6 +348,7 @@ void VideoInputSettingsWidget::onVendorChanged()
   }
 
   refreshDeviceList();
+  updateFormatList();
 }
 
 void VideoInputSettingsWidget::refreshDeviceList()
@@ -380,6 +379,34 @@ void VideoInputSettingsWidget::refreshDeviceList()
   }
   if(m_deviceCombo->count() == 0)
     m_deviceCombo->addItem(tr("(no device detected)"), -1);
+}
+
+void VideoInputSettingsWidget::updateFormatList()
+{
+  // Items carry the token as their text (getSettings reads currentText).
+  const QString prev = m_formatCombo->currentText();
+  m_formatCombo->clear();
+
+  caps::FormatList master;
+  for(const char* tok : {"720p5994",  "720p60",    "1080p2398", "1080p24",
+                         "1080p25",   "1080p2997", "1080p30",   "1080p50",
+                         "1080p5994", "1080p60",   "1080i50",   "1080i5994",
+                         "1080i60",   "2160p25",   "2160p2997", "2160p30",
+                         "2160p50",   "2160p5994", "2160p60"})
+    master.push_back({QString::fromLatin1(tok), QString::fromLatin1(tok)});
+
+  // Keep only what the selected card supports (fail-open to the full list).
+  const int devIdx = m_deviceCombo->currentData().toInt();
+  for(const auto& e :
+      caps::filterVideoFormats(currentVendor(), devIdx, /*forOutput=*/false, master))
+    m_formatCombo->addItem(e.second);
+
+  const QString def = "1080p5994";
+  int idx = m_formatCombo->findText(prev.isEmpty() ? def : prev);
+  if(idx < 0)
+    idx = m_formatCombo->findText(def);
+  if(idx >= 0)
+    m_formatCombo->setCurrentIndex(idx);
 }
 
 Device::DeviceSettings VideoInputSettingsWidget::getSettings() const

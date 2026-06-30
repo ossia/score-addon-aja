@@ -6,6 +6,8 @@
 
 #include <score/serialization/MimeVisitor.hpp>
 
+#include <VideoIOCaps.hpp>
+
 #include <ossia/network/generic/generic_device.hpp>
 
 #include <QCheckBox>
@@ -307,7 +309,11 @@ VideoOutputSettingsWidget::VideoOutputSettingsWidget(QWidget* parent)
       [this](int) { onVendorChanged(); });
   connect(
       m_deviceCombo, qOverload<int>(&QComboBox::currentIndexChanged), this,
-      &VideoOutputSettingsWidget::updateChannelList);
+      [this](int i) {
+        updateChannelList(i);
+        updateFormatList();
+        updatePixelFormatList();
+      });
   connect(
       m_8kModeCombo, qOverload<int>(&QComboBox::currentIndexChanged), this,
       [this](int) { updateFormatList(); });
@@ -335,27 +341,7 @@ void VideoOutputSettingsWidget::onVendorChanged()
   setRow(m_hdrModeCombo, isAja);
   m_rdmaCheckbox->setVisible(isAja);
 
-  // Pixel-format choices are vendor-specific.
-  m_pixelFormatCombo->clear();
-  if(isAja)
-  {
-    m_pixelFormatCombo->addItem("YCbCr 10-bit", "YCbCr10");
-    m_pixelFormatCombo->addItem("YCbCr 8-bit", "YCbCr8");
-    m_pixelFormatCombo->addItem("RGB 8-bit", "RGB8");
-    m_pixelFormatCombo->addItem("RGB 10-bit", "RGB10");
-    m_pixelFormatCombo->addItem("RGB 12-bit", "RGB12");
-    m_pixelFormatCombo->addItem("RGB 12-bit packed", "RGB12P");
-    m_pixelFormatCombo->addItem("RGB 10-bit DPX", "RGB10DPX");
-    m_pixelFormatCombo->addItem("RGB 24-bit", "RGB24");
-  }
-  else
-  {
-    m_pixelFormatCombo->addItem("YCbCr 8-bit", "YCbCr8");
-    m_pixelFormatCombo->addItem("YCbCr 10-bit", "YCbCr10");
-    m_pixelFormatCombo->addItem("BGRA 8-bit", "RGB8");
-    m_pixelFormatCombo->addItem("RGB 10-bit", "RGB10");
-  }
-
+  updatePixelFormatList();
   refreshDeviceList();
   updateFormatList();
 }
@@ -424,40 +410,78 @@ void VideoOutputSettingsWidget::updateChannelList(int)
 
 void VideoOutputSettingsWidget::updateFormatList()
 {
+  const QString prev = m_formatCombo->currentData().toString();
   m_formatCombo->clear();
   const bool isAja = currentVendor() == Vendor::AJA;
   const bool eightK = isAja && m_8kModeCombo->currentData().toInt() != 0;
 
+  caps::FormatList master;
   if(eightK)
   {
-    for(auto [label, tok] : {
-            std::pair{"UHD2 50 (7680x4320)", "UHD2_50"},
-            std::pair{"UHD2 59.94 (7680x4320)", "UHD2_5994"},
-            std::pair{"UHD2 60 (7680x4320)", "UHD2_60"},
-            std::pair{"8K DCI 59.94 (8192x4320)", "8K_5994"},
-            std::pair{"8K DCI 60 (8192x4320)", "8K_60"}})
-      m_formatCombo->addItem(label, tok);
-    int idx = m_formatCombo->findData("UHD2_5994");
-    if(idx >= 0)
-      m_formatCombo->setCurrentIndex(idx);
-    return;
+    master = {
+        {tr("UHD2 50 (7680x4320)"), "UHD2_50"},
+        {tr("UHD2 59.94 (7680x4320)"), "UHD2_5994"},
+        {tr("UHD2 60 (7680x4320)"), "UHD2_60"},
+        {tr("8K DCI 59.94 (8192x4320)"), "8K_5994"},
+        {tr("8K DCI 60 (8192x4320)"), "8K_60"}};
+  }
+  else
+  {
+    master = {
+        {tr("1080p 23.98"), "1080p2398"}, {tr("1080p 24"), "1080p24"},
+        {tr("1080p 25"), "1080p25"},      {tr("1080p 29.97"), "1080p2997"},
+        {tr("1080p 30"), "1080p30"},      {tr("1080p 50"), "1080p50"},
+        {tr("1080p 59.94"), "1080p5994"}, {tr("1080p 60"), "1080p60"},
+        {tr("1080i 50"), "1080i50"},      {tr("1080i 59.94"), "1080i5994"},
+        {tr("720p 50"), "720p50"},        {tr("720p 59.94"), "720p5994"},
+        {tr("720p 60"), "720p60"},        {tr("UHD 25"), "2160p25"},
+        {tr("UHD 29.97"), "2160p2997"},   {tr("UHD 30"), "2160p30"},
+        {tr("UHD 50"), "2160p50"},        {tr("UHD 59.94"), "2160p5994"},
+        {tr("UHD 60"), "2160p60"}};
   }
 
-  for(auto [label, tok] : {
-          std::pair{"1080p 23.98", "1080p2398"}, std::pair{"1080p 24", "1080p24"},
-          std::pair{"1080p 25", "1080p25"}, std::pair{"1080p 29.97", "1080p2997"},
-          std::pair{"1080p 30", "1080p30"}, std::pair{"1080p 50", "1080p50"},
-          std::pair{"1080p 59.94", "1080p5994"}, std::pair{"1080p 60", "1080p60"},
-          std::pair{"1080i 50", "1080i50"}, std::pair{"1080i 59.94", "1080i5994"},
-          std::pair{"720p 50", "720p50"}, std::pair{"720p 59.94", "720p5994"},
-          std::pair{"720p 60", "720p60"}, std::pair{"UHD 25", "2160p25"},
-          std::pair{"UHD 29.97", "2160p2997"}, std::pair{"UHD 30", "2160p30"},
-          std::pair{"UHD 50", "2160p50"}, std::pair{"UHD 59.94", "2160p5994"},
-          std::pair{"UHD 60", "2160p60"}})
-    m_formatCombo->addItem(label, tok);
-  int idx = m_formatCombo->findData("1080p5994");
+  // Keep only what the selected card supports (fail-open to the full list).
+  const int devIdx = m_deviceCombo->currentData().toInt();
+  for(const auto& e : caps::filterVideoFormats(currentVendor(), devIdx, true, master))
+    m_formatCombo->addItem(e.first, e.second);
+
+  const QString def = eightK ? "UHD2_5994" : "1080p5994";
+  int idx = m_formatCombo->findData(prev);
+  if(idx < 0)
+    idx = m_formatCombo->findData(def);
   if(idx >= 0)
     m_formatCombo->setCurrentIndex(idx);
+}
+
+void VideoOutputSettingsWidget::updatePixelFormatList()
+{
+  const QString prev = m_pixelFormatCombo->currentData().toString();
+  m_pixelFormatCombo->clear();
+  const bool isAja = currentVendor() == Vendor::AJA;
+
+  caps::FormatList master;
+  if(isAja)
+  {
+    master = {
+        {tr("YCbCr 10-bit"), "YCbCr10"},    {tr("YCbCr 8-bit"), "YCbCr8"},
+        {tr("RGB 8-bit"), "RGB8"},          {tr("RGB 10-bit"), "RGB10"},
+        {tr("RGB 12-bit"), "RGB12"},        {tr("RGB 12-bit packed"), "RGB12P"},
+        {tr("RGB 10-bit DPX"), "RGB10DPX"}, {tr("RGB 24-bit"), "RGB24"}};
+  }
+  else
+  {
+    master = {
+        {tr("YCbCr 8-bit"), "YCbCr8"}, {tr("YCbCr 10-bit"), "YCbCr10"},
+        {tr("BGRA 8-bit"), "RGB8"},    {tr("RGB 10-bit"), "RGB10"}};
+  }
+
+  const int devIdx = m_deviceCombo->currentData().toInt();
+  for(const auto& e : caps::filterPixelFormats(currentVendor(), devIdx, master))
+    m_pixelFormatCombo->addItem(e.first, e.second);
+
+  int idx = m_pixelFormatCombo->findData(prev);
+  if(idx >= 0)
+    m_pixelFormatCombo->setCurrentIndex(idx);
 }
 
 Device::DeviceSettings VideoOutputSettingsWidget::getSettings() const

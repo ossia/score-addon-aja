@@ -97,6 +97,7 @@ private:
   void refreshDeviceList();
   void updateChannelList(int deviceIndex);
   void updateFormatList();
+  void updatePixelFormatList();
 
   QFormLayout* m_layout{};
   QLineEdit* m_deviceNameEdit{};

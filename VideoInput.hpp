@@ -92,6 +92,7 @@ private:
   Vendor currentVendor() const;
   void onVendorChanged();
   void refreshDeviceList();
+  void updateFormatList();
 
   QFormLayout* m_layout{};
   QLineEdit* m_deviceNameEdit{};
