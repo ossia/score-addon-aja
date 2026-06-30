@@ -1,0 +1,3 @@
+[submodule "3rdparty/libajantv2"]
+	path = 3rdparty/libajantv2
+	url = https://github.com/jcelerier/libajantv2

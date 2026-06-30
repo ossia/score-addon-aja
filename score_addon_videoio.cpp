@@ -1,20 +1,41 @@
 #include "score_addon_videoio.hpp"
 
+#include <Device/Protocol/ProtocolFactoryInterface.hpp>
+
 #include <score/plugins/FactorySetup.hpp>
 
 #include <score_plugin_gfx.hpp>
 
-score_addon_videoio::score_addon_videoio() = default;
+#if defined(SCORE_HAS_AJA)
+#include <AJA/AJAInput.hpp>
+#include <AJA/AJAOutput.hpp>
+#endif
+
+score_addon_videoio::score_addon_videoio()
+{
+#if defined(SCORE_HAS_AJA)
+  qRegisterMetaType<Gfx::AJA::AJAOutputSettings>();
+  qRegisterMetaType<Gfx::AJA::AJAInputSettings>();
+#endif
+}
+
 score_addon_videoio::~score_addon_videoio() = default;
 
 std::vector<score::InterfaceBase*> score_addon_videoio::factories(
     const score::ApplicationContext& ctx, const score::InterfaceKey& key) const
 {
-  // The unified Direct Video I/O protocol/device is added here once Split 3b
-  // lands; for now the addon ships the vendor backends (compiled + ready).
-  (void)ctx;
-  (void)key;
-  return {};
+  // Parity checkpoint: the AJA device/GPU code is relocated verbatim and its
+  // factories registered as-is. The unified Direct Video I/O device (with
+  // per-vendor enumerators + DeckLink) replaces these in the next pass.
+  return instantiate_factories<
+      score::ApplicationContext,
+      FW<Device::ProtocolFactory
+#if defined(SCORE_HAS_AJA)
+         ,
+         Gfx::AJA::AJAProtocolFactory,
+         Gfx::AJA::AJAInputProtocolFactory
+#endif
+         >>(ctx, key);
 }
 
 auto score_addon_videoio::required() const -> std::vector<score::PluginKey>
