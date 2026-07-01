@@ -255,6 +255,10 @@ bool VideoOutputDevice::reconnect()
           node = new Gfx::Bluefish::BluefishNode{toBluefish(set)};
 #endif
           break;
+        case Vendor::Magewell:
+          // Magewell is capture-only — no playout. It's never offered by the
+          // output enumerator/widget; node stays null -> graceful no-op below.
+          break;
       }
 
       if(!node)
