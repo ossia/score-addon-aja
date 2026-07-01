@@ -1,0 +1,28 @@
+#pragma once
+#include <cstdint>
+#include <string>
+#include <vector>
+
+namespace Gfx::Magewell
+{
+
+/// A Magewell capture channel as seen by the unified Direct Video I/O
+/// enumerator. Magewell PCIe cards are capture-only (no playout), so canOutput
+/// is always false.
+struct DeviceInfo
+{
+  int index{};            ///< channel index passed to MWGetDevicePath
+  std::string displayName;
+  bool canInput{true};    ///< every enumerated capture channel is an input
+  bool canOutput{false};  ///< Magewell has no playout
+};
+
+/// Initialize the MWCapture runtime exactly once (MWCaptureInitInstance).
+/// Process-lifetime init; safe to call repeatedly. Returns false if the SDK
+/// runtime/driver is missing.
+bool ensureMwInit() noexcept;
+
+/// Enumerate installed Magewell capture channels (PCIe only; USB skipped).
+std::vector<DeviceInfo> enumerateDevices();
+
+} // namespace Gfx::Magewell

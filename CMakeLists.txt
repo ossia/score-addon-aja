@@ -196,6 +196,38 @@ else()
   message(STATUS "score-addon-videoio: Bluefish444 disabled (need WIN32 + BlueVelvetC SDK)")
 endif()
 
+# --- Magewell Pro Capture (LibMWCapture) -------------------------------------
+# Plain C API + import lib (no codegen). Capture-only: Magewell PCIe cards have
+# no playout, so there is only an input backend, host-staged (no GPU-direct).
+set(MAGEWELL_SDK_ROOT "c:/dev/magewell/SDKv3" CACHE PATH "Magewell MWCapture SDK root")
+if(WIN32 AND EXISTS "${MAGEWELL_SDK_ROOT}/Include/LibMWCapture/MWCapture.h"
+   AND EXISTS "${MAGEWELL_SDK_ROOT}/Lib/x64/LibMWCapture.lib")
+  list(APPEND VIDEOIO_HDRS
+    "${CMAKE_CURRENT_SOURCE_DIR}/magewell/Magewell.hpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/magewell/MagewellFormats.hpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/magewell/MagewellDevices.hpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/magewell/MagewellCpuCapture.hpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/magewell/MagewellInputBackend.hpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/magewell/MagewellCaptureNode.hpp")
+  list(APPEND VIDEOIO_SRCS
+    "${CMAKE_CURRENT_SOURCE_DIR}/magewell/MagewellDevices.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/magewell/MagewellInputBackend.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/magewell/MagewellCaptureNode.cpp")
+  list(APPEND VIDEOIO_INCS
+    "${MAGEWELL_SDK_ROOT}/Include"
+    "${MAGEWELL_SDK_ROOT}/Include/LibMWCapture")
+  list(APPEND VIDEOIO_DEFS SCORE_HAS_MAGEWELL=1)
+  set(VIDEOIO_MAGEWELL_LIB "${MAGEWELL_SDK_ROOT}/Lib/x64/LibMWCapture.lib")
+  # LibMWCapture.lib is an import lib; the runtime DLL ships under the Python
+  # example bindings (no DLL under Lib/x64). Copy it post-build if present.
+  set(VIDEOIO_MAGEWELL_DLL
+    "${MAGEWELL_SDK_ROOT}/Examples/Python/AVCapturePY/mwcapture/bin/x64/LibMWCapture.dll")
+  set(VIDEOIO_HAS_MAGEWELL TRUE)
+  message(STATUS "score-addon-videoio: Magewell enabled (SDK: ${MAGEWELL_SDK_ROOT})")
+else()
+  message(STATUS "score-addon-videoio: Magewell disabled (need WIN32 + LibMWCapture SDK)")
+endif()
+
 # ---------------------------------------------------------------------------
 add_library(${PROJECT_NAME}
   ${VIDEOIO_SRCS} ${VIDEOIO_HDRS} ${VIDEOIO_GEN_SRCS})
@@ -281,6 +313,31 @@ if(VIDEOIO_HAS_BLUEFISH)
         "${VIDEOIO_BLUEFISH_DLL}"
         "$<TARGET_FILE_DIR:${PROJECT_NAME}>/BlueVelvetC64.dll"
       COMMENT "Copying BlueVelvetC64.dll alongside ${PROJECT_NAME}")
+  endif()
+endif()
+
+# --- Magewell link -----------------------------------------------------------
+if(VIDEOIO_HAS_MAGEWELL)
+  target_link_libraries(${PROJECT_NAME} PRIVATE "${VIDEOIO_MAGEWELL_LIB}")
+
+  # MWCapture.h pulls in <Windows.h>/<ks.h>/<ksmedia.h>; it compiles cleanly
+  # under clang64 without -fdeclspec (LIBMWCAPTURE_API stays empty since we do
+  # not define LIBMWCAPTURE_DLL, so no __declspec(dllimport)). Keep the SDK TUs
+  # out of score's shared PCH to avoid Windows-header/PCH ordering surprises,
+  # confined to magewell/*.cpp — the neutral wiring stays PCH-clean and SDK-free.
+  set(VIDEOIO_MAGEWELL_SRCS
+    "${CMAKE_CURRENT_SOURCE_DIR}/magewell/MagewellDevices.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/magewell/MagewellInputBackend.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/magewell/MagewellCaptureNode.cpp")
+  set_source_files_properties(${VIDEOIO_MAGEWELL_SRCS} PROPERTIES
+    SKIP_PRECOMPILE_HEADERS ON)
+
+  if(WIN32 AND EXISTS "${VIDEOIO_MAGEWELL_DLL}")
+    add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
+      COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "${VIDEOIO_MAGEWELL_DLL}"
+        "$<TARGET_FILE_DIR:${PROJECT_NAME}>/LibMWCapture.dll"
+      COMMENT "Copying LibMWCapture.dll alongside ${PROJECT_NAME}")
   endif()
 endif()
 

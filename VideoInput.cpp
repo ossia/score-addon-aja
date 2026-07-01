@@ -47,6 +47,12 @@
 #include <bluefish/BluefishSettings.hpp>
 #endif
 
+#if defined(SCORE_HAS_MAGEWELL)
+#include <magewell/MagewellCaptureNode.hpp>
+#include <magewell/MagewellDevices.hpp>
+#include <magewell/MagewellFormats.hpp>
+#endif
+
 W_OBJECT_IMPL(Gfx::VideoIO::VideoInputDevice)
 
 namespace Gfx::VideoIO
@@ -111,6 +117,18 @@ Gfx::Bluefish::BluefishInputSettings toBluefishInput(const VideoInputSettings& s
   // the widget's "expected format" is only a UI hint.
   b.memoryFormat = Gfx::Bluefish::memFmtFromToken(s.pixelFormat);
   return b;
+}
+#endif
+
+#if defined(SCORE_HAS_MAGEWELL)
+Gfx::Magewell::MagewellInputSettings toMagewellInput(const VideoInputSettings& s)
+{
+  Gfx::Magewell::MagewellInputSettings m;
+  m.deviceIndex = s.deviceIndex;
+  // Magewell auto-detects the incoming signal (geometry comes from
+  // MWGetVideoSignalStatus), so videoFormat is ignored; only the FOURCC matters.
+  m.fourcc = Gfx::Magewell::fourccFromToken(s.pixelFormat);
+  return m;
 }
 #endif
 
@@ -306,6 +324,19 @@ bool VideoInputDevice::reconnect()
 #endif
         break;
       }
+      case Vendor::Magewell:
+      {
+#if defined(SCORE_HAS_MAGEWELL)
+        registerGpuDirect(
+            new Gfx::Magewell::MagewellCaptureNode{toMagewellInput(set)});
+        qDebug() << "Direct Video Input: Magewell host-staged node";
+        return connected();
+#else
+        qDebug() << "Direct Video Input: Magewell not compiled in";
+        return false;
+#endif
+        break;
+      }
     }
   }
   catch(std::exception& e)
@@ -344,6 +375,9 @@ VideoInputSettingsWidget::VideoInputSettingsWidget(QWidget* parent)
 #endif
 #if defined(SCORE_HAS_BLUEFISH)
   m_vendorCombo->addItem("Bluefish444", static_cast<int>(Vendor::Bluefish));
+#endif
+#if defined(SCORE_HAS_MAGEWELL)
+  m_vendorCombo->addItem("Magewell", static_cast<int>(Vendor::Magewell));
 #endif
   m_layout->addRow(tr("Vendor"), m_vendorCombo);
 
@@ -400,6 +434,8 @@ void VideoInputSettingsWidget::onVendorChanged()
   setRow(m_resolutionModeCombo, isAja);
   setRow(m_routingModeCombo, isAja);
 
+  const bool isMagewell = currentVendor() == Vendor::Magewell;
+
   m_pixelFormatCombo->clear();
   if(isAja)
   {
@@ -407,6 +443,14 @@ void VideoInputSettingsWidget::onVendorChanged()
     m_pixelFormatCombo->addItem("YCbCr 10-bit (v210, GPU-direct only)", "YCbCr10");
     m_pixelFormatCombo->addItem("ARGB (32-bit BGRA)", "ARGB");
     m_pixelFormatCombo->addItem("RGBA (32-bit RGBA)", "RGBA");
+  }
+  else if(isMagewell)
+  {
+    // Magewell FOURCC tokens (translated to MWFOURCC_* in toMagewellInput).
+    m_pixelFormatCombo->addItem("YCbCr 8-bit (UYVY)", "UYVY");
+    m_pixelFormatCombo->addItem("YCbCr 10-bit (v210)", "V210");
+    m_pixelFormatCombo->addItem("BGRA 8-bit", "BGRA");
+    m_pixelFormatCombo->addItem("RGBA 8-bit", "RGBA");
   }
   else
   {
@@ -462,6 +506,16 @@ void VideoInputSettingsWidget::refreshDeviceList()
   {
     Gfx::Bluefish::ensureBlueInit();
     for(const auto& dev : Gfx::Bluefish::enumerateDevices())
+      if(dev.canInput)
+        m_deviceCombo->addItem(
+            QString::fromStdString(dev.displayName), dev.index);
+  }
+#endif
+#if defined(SCORE_HAS_MAGEWELL)
+  else if(vendor == Vendor::Magewell)
+  {
+    Gfx::Magewell::ensureMwInit();
+    for(const auto& dev : Gfx::Magewell::enumerateDevices())
       if(dev.canInput)
         m_deviceCombo->addItem(
             QString::fromStdString(dev.displayName), dev.index);
@@ -660,6 +714,33 @@ public:
   }
 };
 #endif
+
+#if defined(SCORE_HAS_MAGEWELL)
+class MagewellVideoInputEnumerator final : public Device::DeviceEnumerator
+{
+public:
+  void enumerate(
+      std::function<void(const QString&, const Device::DeviceSettings&)> func)
+      const override
+  {
+    Gfx::Magewell::ensureMwInit();
+    for(const auto& dev : Gfx::Magewell::enumerateDevices())
+    {
+      if(!dev.canInput)
+        continue;
+      Device::DeviceSettings s;
+      s.name = QString::fromStdString(dev.displayName);
+      s.protocol = VideoInputProtocolFactory::static_concreteKey();
+      VideoInputSettings set;
+      set.vendor = Vendor::Magewell;
+      set.deviceName = s.name;
+      set.deviceIndex = dev.index;
+      s.deviceSpecificSettings = QVariant::fromValue(set);
+      func(s.name, s);
+    }
+  }
+};
+#endif
 } // namespace
 
 Device::DeviceEnumerators
@@ -677,6 +758,9 @@ VideoInputProtocolFactory::getEnumerators(const score::DocumentContext&) const
 #endif
 #if defined(SCORE_HAS_BLUEFISH)
   e.push_back({"Bluefish444", new BluefishVideoInputEnumerator});
+#endif
+#if defined(SCORE_HAS_MAGEWELL)
+  e.push_back({"Magewell", new MagewellVideoInputEnumerator});
 #endif
   return e;
 }

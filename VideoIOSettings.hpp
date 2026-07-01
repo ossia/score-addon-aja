@@ -18,7 +18,8 @@ enum class Vendor : int
   AJA = 0,
   DeckLink = 1,
   Deltacast = 2,
-  Bluefish = 3
+  Bluefish = 3,
+  Magewell = 4
 };
 
 /// Vendor-neutral playout settings. Vendor-specific knobs are carried as plain
