@@ -221,6 +221,9 @@ struct DeltacastRdmaCapture final : score::gfx::interop::GpuDirectCaptureStrateg
   {
     // Capture thread: the card RDMA-wrote the frame into slot i's GPU VRAM.
     // Copy it into the renderer texture's CUDA array, then publish.
+    // No InteropFence needed on capture: cuda_p2p_copy_buffer_to_array is
+    // stream-synchronized on return (cuStreamSynchronize), so the CUarray is
+    // fully written before publish() hands it to the render thread.
     if(i >= kSlotCount || !m_imgArray)
       return false;
     if(cuda_p2p_copy_buffer_to_array(

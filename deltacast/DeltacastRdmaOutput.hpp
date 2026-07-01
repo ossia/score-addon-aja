@@ -50,6 +50,7 @@
 #include <Gfx/Graph/interop/CudaFunctions.hpp>
 #include <Gfx/Graph/interop/CudaP2PBridge.h>
 #include <Gfx/Graph/interop/GpuDirectStrategy.hpp>
+#include <Gfx/Graph/interop/InteropFence.hpp>
 #include <Gfx/Graph/interop/RdmaGpuBuffer.hpp>
 #include <Gfx/Graph/interop/VideoPixelFormat.hpp>
 #include <Gfx/Graph/interop/VkExternalMemoryHelpers.hpp>
@@ -126,6 +127,14 @@ struct DeltacastRdmaOutput final : score::gfx::interop::GpuDirectStrategy
 
   std::uint32_t m_rowBytes{};
   std::uint32_t m_texH{};
+
+  // Vulkan->CUDA ordering fence: QRhi signals a binary VkSemaphore at the
+  // endOffscreenFrame queue submit (after the encoder + copyTexture), CUDA
+  // waits on it before the array->buffer copy reads m_exportArray. Non-fatal:
+  // if init fails, prepareNextFrame() falls back to a full cfg.rhi->finish().
+  std::unique_ptr<score::gfx::interop::InteropFence> m_fence;
+  bool m_fenceOk{};
+  std::uint64_t m_fenceValue{};
 
   const char* name() const noexcept override { return "Deltacast-RDMA-Vulkan-OUT"; }
 
@@ -242,6 +251,15 @@ struct DeltacastRdmaOutput final : score::gfx::interop::GpuDirectStrategy
     if(!m_backend->registerRdmaOutputSlots(gpuVAs, kSlotCount))
       return releaseFail("registerRdmaOutputSlots");
 
+    // 5. Vulkan->CUDA ordering fence (non-fatal). If the binary-semaphore path
+    //    can't be set up (extension missing, non-RDMA driver, ...), prepareNextFrame()
+    //    falls back to cfg.rhi->finish() — correctness is preserved either way.
+    m_fence = score::gfx::interop::makeInteropFence(*cfg.rhi);
+    m_fenceOk = m_fence && m_fence->init(*cfg.rhi, m_cudaCtx);
+    if(!m_fenceOk)
+      qDebug() << "Deltacast RDMA-OUT(Vulkan): InteropFence unavailable — "
+                  "using rhi->finish() fallback for Vulkan->CUDA ordering";
+
     return true;
   }
 
@@ -256,6 +274,13 @@ struct DeltacastRdmaOutput final : score::gfx::interop::GpuDirectStrategy
     auto* rub = cfg.rhi->nextResourceUpdateBatch();
     rub->copyTexture(m_exportTex, m_encTex);
     cb.resourceUpdate(rub);
+
+    // Ask QRhi to signal a binary VkSemaphore at the coming endOffscreenFrame
+    // queue submit (after the encoder + copyTexture complete on the GPU). CUDA
+    // waits on it in prepareNextFrame() before reading m_exportArray. Runs here,
+    // inside the offscreen frame, so setQueueSubmitParams applies to that submit.
+    if(m_fenceOk)
+      m_fence->signalAfterEncode(cb, ++m_fenceValue);
   }
 
   void* prepareNextFrame() override
@@ -265,6 +290,16 @@ struct DeltacastRdmaOutput final : score::gfx::interop::GpuDirectStrategy
     // into the next RDMA slot's GPU VRAM (the card's DMA source).
     if(!m_exportArray)
       return nullptr;
+
+    // Ensure the Vulkan encoder + copyTexture have finished before CUDA reads
+    // the exportable image. With the fence, schedule a CUDA-stream wait on the
+    // semaphore QRhi signalled at submit; without it, a full GPU wait (mirrors
+    // the GL glFinish fence) — either way the copy below sees complete data.
+    if(m_fenceOk)
+      m_fence->waitOnCuda(m_fenceValue);
+    else
+      cfg.rhi->finish();
+
     const std::size_t idx = m_idx;
     if(cuda_p2p_copy_array_to_buffer(
            m_cudaCtx, m_exportArray, m_rdma.slot(idx).gpuVA, m_rowBytes, m_texH,
@@ -277,6 +312,16 @@ struct DeltacastRdmaOutput final : score::gfx::interop::GpuDirectStrategy
 
   void release() override
   {
+    // Release the fence (its CUDA semaphores + VkSemaphores) while the CUDA
+    // primary context is still alive.
+    if(m_fence)
+    {
+      m_fence->release();
+      m_fence.reset();
+    }
+    m_fenceOk = false;
+    m_fenceValue = 0;
+
     // Destroy the RDMA VMM slots while the CUDA primary context is still alive.
     // (The VHD slots themselves are torn down by the backend's VHD_StopStream.)
     m_rdma.destroy();
