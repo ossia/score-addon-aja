@@ -38,9 +38,11 @@ bool DeltacastOutputBackend::open(score::gfx::GraphicsApi)
      || !m_board)
     return false;
 
-  // Genlock on the local 1/1 (European) clock; fractional rates would flip this
-  // to VHD_CLOCKDIV_FRAC — a refinement.
-  VHD_SetBoardProperty(m_board, VHD_SDI_BP_GENLOCK_CLOCK_DIV, VHD_CLOCKDIV_1);
+  // Genlock clock divisor: VHD_CLOCKDIV_1001 for /1.001 rates (59.94/29.97/
+  // 23.98), else the integer VHD_CLOCKDIV_1 (60/50/30/25/24).
+  VHD_SetBoardProperty(
+      m_board, VHD_SDI_BP_GENLOCK_CLOCK_DIV,
+      m_settings.fractionalClock ? VHD_CLOCKDIV_1001 : VHD_CLOCKDIV_1);
 
   if(VHD_OpenStreamHandle(
          m_board, VHD_ST_TX0, VHD_SDI_STPROC_DISJOINED_VIDEO, nullptr, &m_stream,

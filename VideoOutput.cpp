@@ -111,6 +111,7 @@ Gfx::Deltacast::DeltacastOutputSettings toDeltacast(const VideoOutputSettings& s
   d.deviceIndex = s.deviceIndex;
   d.videoStandard = Gfx::Deltacast::vhdStandardFromToken(s.videoFormat);
   d.bufferPacking = Gfx::Deltacast::vhdPackingFromToken(s.pixelFormat);
+  d.fractionalClock = Gfx::Deltacast::vhdIsFractionalRate(s.videoFormat);
   return d;
 }
 #endif

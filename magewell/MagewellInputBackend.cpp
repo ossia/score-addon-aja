@@ -243,11 +243,22 @@ void MagewellInputBackend::runLoop()
       continue;
 
     // Capture the newest fully-buffered frame straight into the slot in the
-    // selected FOURCC (no CSC). On-card colour conversion would use the
-    // MWCaptureVideoFrameToVirtualAddressEx variant — a future enhancement.
-    if(MWCaptureVideoFrameToVirtualAddress(
+    // selected FOURCC, driving the card's on-card CSC + deinterlace so no CPU
+    // swizzle is needed: RGB targets get RGB output, YUV targets BT.709.
+    const MWCAP_VIDEO_COLOR_FORMAT csc
+        = (m_settings.fourcc == MWFOURCC_BGRA || m_settings.fourcc == MWFOURCC_RGBA)
+              ? MWCAP_VIDEO_COLOR_FORMAT_RGB
+              : MWCAP_VIDEO_COLOR_FORMAT_YUV709;
+    if(MWCaptureVideoFrameToVirtualAddressEx(
            m_channel, binfo.iNewestBufferedFullFrame, dst, m_frameByteSize,
-           m_stride, FALSE, (MWCAP_PTR64)0, m_settings.fourcc, m_width, m_height)
+           m_stride, FALSE, (MWCAP_PTR64)0, m_settings.fourcc, m_width, m_height,
+           /*dwProcessSwitchs*/ 0, /*cyParitalNotify*/ 0,
+           /*hOSDImage*/ (HOSD)0, /*pOSDRects*/ nullptr, /*cOSDRects*/ 0,
+           /*sContrast*/ 0, /*sBrightness*/ 0, /*sSaturation*/ 0, /*sHue*/ 0,
+           MWCAP_VIDEO_DEINTERLACE_WEAVE, MWCAP_VIDEO_ASPECT_RATIO_IGNORE,
+           /*pRectSrc*/ nullptr, /*pRectDest*/ nullptr,
+           /*nAspectX*/ 0, /*nAspectY*/ 0, csc,
+           MWCAP_VIDEO_QUANTIZATION_UNKNOWN, MWCAP_VIDEO_SATURATION_UNKNOWN)
        != MW_SUCCEEDED)
       continue;
 

@@ -20,6 +20,7 @@ struct DeltacastOutputSettings
   int deviceIndex{0};
   ULONG videoStandard{VHD_VIDEOSTD_S274M_1080p_60Hz}; ///< VHD_VIDEOSTANDARD
   ULONG bufferPacking{VHD_BUFPACK_VIDEO_YUV422_8};    ///< VHD_BUFFERPACKING
+  bool fractionalClock{false}; ///< /1.001 rate (59.94/29.97/23.98) -> CLOCKDIV_1001
   bool useRDMA{true};  ///< Try the RDMA GPU-direct playout path (Vulkan+CUDA) first.
 };
 
