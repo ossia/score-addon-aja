@@ -166,6 +166,36 @@ else()
   message(STATUS "score-addon-videoio: DELTACAST disabled (need WIN32 + VideoMaster SDK)")
 endif()
 
+# --- Bluefish444 BlueVelvetC -------------------------------------------------
+# Plain C headers + import lib (no codegen). Host-staged v1; BlueGpuDirect later.
+set(BLUEFISH_SDK_ROOT "c:/dev/bluefish444" CACHE PATH "Bluefish444 SDK root")
+if(WIN32 AND EXISTS "${BLUEFISH_SDK_ROOT}/inc/BlueVelvetC.h"
+   AND EXISTS "${BLUEFISH_SDK_ROOT}/lib/win/BlueVelvetC64.lib")
+  list(APPEND VIDEOIO_HDRS
+    "${CMAKE_CURRENT_SOURCE_DIR}/bluefish/Bluefish.hpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/bluefish/BluefishFormats.hpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/bluefish/BluefishDevices.hpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/bluefish/BluefishCpuCapture.hpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/bluefish/BluefishOutputBackend.hpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/bluefish/BluefishInputBackend.hpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/bluefish/BluefishNode.hpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/bluefish/BluefishCaptureNode.hpp")
+  list(APPEND VIDEOIO_SRCS
+    "${CMAKE_CURRENT_SOURCE_DIR}/bluefish/BluefishDevices.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/bluefish/BluefishOutputBackend.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/bluefish/BluefishInputBackend.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/bluefish/BluefishNode.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/bluefish/BluefishCaptureNode.cpp")
+  list(APPEND VIDEOIO_INCS "${BLUEFISH_SDK_ROOT}/inc")
+  list(APPEND VIDEOIO_DEFS SCORE_HAS_BLUEFISH=1)
+  set(VIDEOIO_BLUEFISH_LIB "${BLUEFISH_SDK_ROOT}/lib/win/BlueVelvetC64.lib")
+  set(VIDEOIO_BLUEFISH_DLL "${BLUEFISH_SDK_ROOT}/driver/Release/BlueVelvetC64.dll")
+  set(VIDEOIO_HAS_BLUEFISH TRUE)
+  message(STATUS "score-addon-videoio: Bluefish444 enabled (SDK: ${BLUEFISH_SDK_ROOT})")
+else()
+  message(STATUS "score-addon-videoio: Bluefish444 disabled (need WIN32 + BlueVelvetC SDK)")
+endif()
+
 # ---------------------------------------------------------------------------
 add_library(${PROJECT_NAME}
   ${VIDEOIO_SRCS} ${VIDEOIO_HDRS} ${VIDEOIO_GEN_SRCS})
@@ -222,6 +252,35 @@ if(VIDEOIO_HAS_DELTACAST)
         "${VIDEOIO_DELTACAST_DLL}"
         "$<TARGET_FILE_DIR:${PROJECT_NAME}>/VideoMasterHD.dll"
       COMMENT "Copying VideoMasterHD.dll alongside ${PROJECT_NAME}")
+  endif()
+endif()
+
+# --- Bluefish444 link --------------------------------------------------------
+if(VIDEOIO_HAS_BLUEFISH)
+  target_link_libraries(${PROJECT_NAME} PRIVATE "${VIDEOIO_BLUEFISH_LIB}")
+
+  # BlueVelvetC.h uses MSVC __declspec(dllimport, deprecated(...)) which clang
+  # only accepts with -fdeclspec; that flag is incompatible with score's shared
+  # PCH (built without it). Confine both to the bluefish/*.cpp TUs (the only ones
+  # that pull in the SDK) — the neutral wiring stays PCH-clean and SDK-free.
+  set(VIDEOIO_BLUEFISH_SRCS
+    "${CMAKE_CURRENT_SOURCE_DIR}/bluefish/BluefishDevices.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/bluefish/BluefishOutputBackend.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/bluefish/BluefishInputBackend.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/bluefish/BluefishNode.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/bluefish/BluefishCaptureNode.cpp")
+  set_source_files_properties(${VIDEOIO_BLUEFISH_SRCS} PROPERTIES
+    SKIP_PRECOMPILE_HEADERS ON)
+  if(NOT MSVC)
+    set_source_files_properties(${VIDEOIO_BLUEFISH_SRCS} PROPERTIES
+      COMPILE_OPTIONS -fdeclspec)
+  endif()
+  if(WIN32 AND EXISTS "${VIDEOIO_BLUEFISH_DLL}")
+    add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
+      COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "${VIDEOIO_BLUEFISH_DLL}"
+        "$<TARGET_FILE_DIR:${PROJECT_NAME}>/BlueVelvetC64.dll"
+      COMMENT "Copying BlueVelvetC64.dll alongside ${PROJECT_NAME}")
   endif()
 endif()
 

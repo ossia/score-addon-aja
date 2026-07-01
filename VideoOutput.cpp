@@ -38,6 +38,12 @@
 #include <deltacast/DeltacastNode.hpp>
 #endif
 
+#if defined(SCORE_HAS_BLUEFISH)
+#include <bluefish/BluefishDevices.hpp>
+#include <bluefish/BluefishNode.hpp>
+#include <bluefish/BluefishSettings.hpp>
+#endif
+
 W_OBJECT_IMPL(Gfx::VideoIO::VideoOutputDevice)
 
 namespace Gfx::VideoIO
@@ -106,6 +112,17 @@ Gfx::Deltacast::DeltacastOutputSettings toDeltacast(const VideoOutputSettings& s
   d.videoStandard = Gfx::Deltacast::vhdStandardFromToken(s.videoFormat);
   d.bufferPacking = Gfx::Deltacast::vhdPackingFromToken(s.pixelFormat);
   return d;
+}
+#endif
+
+#if defined(SCORE_HAS_BLUEFISH)
+Gfx::Bluefish::BluefishOutputSettings toBluefish(const VideoOutputSettings& s)
+{
+  Gfx::Bluefish::BluefishOutputSettings b;
+  b.deviceIndex = std::max(1, s.deviceIndex); // Bluefish ids are 1-based
+  b.videoModeExt = Gfx::Bluefish::videoModeExtFromToken(s.videoFormat);
+  b.memoryFormat = Gfx::Bluefish::memFmtFromToken(s.pixelFormat);
+  return b; // videoModeExt/memoryFormat carried as uint32_t (EVideoModeExt/EMemoryFormat)
 }
 #endif
 
@@ -233,6 +250,11 @@ bool VideoOutputDevice::reconnect()
           node = new Gfx::Deltacast::DeltacastNode{toDeltacast(set)};
 #endif
           break;
+        case Vendor::Bluefish:
+#if defined(SCORE_HAS_BLUEFISH)
+          node = new Gfx::Bluefish::BluefishNode{toBluefish(set)};
+#endif
+          break;
       }
 
       if(!node)
@@ -283,6 +305,9 @@ VideoOutputSettingsWidget::VideoOutputSettingsWidget(QWidget* parent)
 #endif
 #if defined(SCORE_HAS_DELTACAST)
   m_vendorCombo->addItem("DELTACAST", static_cast<int>(Vendor::Deltacast));
+#endif
+#if defined(SCORE_HAS_BLUEFISH)
+  m_vendorCombo->addItem("Bluefish444", static_cast<int>(Vendor::Bluefish));
 #endif
   m_layout->addRow(tr("Vendor"), m_vendorCombo);
 
@@ -407,6 +432,18 @@ void VideoOutputSettingsWidget::refreshDeviceList()
   {
     Gfx::Deltacast::ensureVhdInit();
     for(const auto& dev : Gfx::Deltacast::enumerateDevices())
+    {
+      if(dev.canOutput)
+        m_deviceCombo->addItem(
+            QString::fromStdString(dev.displayName), dev.index);
+    }
+  }
+#endif
+#if defined(SCORE_HAS_BLUEFISH)
+  else if(vendor == Vendor::Bluefish)
+  {
+    Gfx::Bluefish::ensureBlueInit();
+    for(const auto& dev : Gfx::Bluefish::enumerateDevices())
     {
       if(dev.canOutput)
         m_deviceCombo->addItem(
@@ -668,6 +705,33 @@ public:
   }
 };
 #endif
+
+#if defined(SCORE_HAS_BLUEFISH)
+class BluefishVideoOutputEnumerator final : public Device::DeviceEnumerator
+{
+public:
+  void enumerate(
+      std::function<void(const QString&, const Device::DeviceSettings&)> func)
+      const override
+  {
+    Gfx::Bluefish::ensureBlueInit();
+    for(const auto& dev : Gfx::Bluefish::enumerateDevices())
+    {
+      if(!dev.canOutput)
+        continue;
+      Device::DeviceSettings s;
+      s.name = QString::fromStdString(dev.displayName);
+      s.protocol = VideoOutputProtocolFactory::static_concreteKey();
+      VideoOutputSettings set;
+      set.vendor = Vendor::Bluefish;
+      set.deviceName = s.name;
+      set.deviceIndex = dev.index;
+      s.deviceSpecificSettings = QVariant::fromValue(set);
+      func(s.name, s);
+    }
+  }
+};
+#endif
 } // namespace
 
 Device::DeviceEnumerators
@@ -682,6 +746,9 @@ VideoOutputProtocolFactory::getEnumerators(const score::DocumentContext&) const
 #endif
 #if defined(SCORE_HAS_DELTACAST)
   e.push_back({"DELTACAST", new DeltacastVideoOutputEnumerator});
+#endif
+#if defined(SCORE_HAS_BLUEFISH)
+  e.push_back({"Bluefish444", new BluefishVideoOutputEnumerator});
 #endif
   return e;
 }
